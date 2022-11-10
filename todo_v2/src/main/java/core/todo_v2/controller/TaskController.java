@@ -9,8 +9,10 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -83,15 +85,65 @@ public class TaskController {
 	ResponseEntity<ResponseObject> getTasksByDes(@RequestBody Map<String, Object> body) {
 		try {
 			LOGGER.info("TaskController: search tasks");
-			if (body.isEmpty() || !body.containsKey("des")) {
+			if (body.isEmpty()) {
 				LOGGER.info("TaskController: Empty Params");
 				return ResponseEntity.status(500).body(new ResponseObject(500, "Invalid value", ""));
 			}
-			List<Task> data = service.getTaskByDes(body);
+			List<Task> data = service.searchTasks(body);
 			if (data.isEmpty() || data == null) {
 				return ResponseEntity.status(204).body(new ResponseObject(204, "No content", ""));
 			}
 			return ResponseEntity.status(200).body(new ResponseObject(200, "Success", data));
+		} catch (MongoException e) {
+			LOGGER.info("TaskController: Error");
+			return ResponseEntity.status(500).body(new ResponseObject(500, "Server Error", ""));
+		}
+	}
+	
+	/**
+	 * @author Quang
+	 * set status of task is complete
+	 */
+	@PutMapping(value = "/setComplete")
+	ResponseEntity<ResponseObject> setComplete(@RequestBody Map<String, Object> body) {
+		try {
+			LOGGER.info("TaskController: set complete tasks");
+			if (body.isEmpty() || !body.containsKey("id")) {
+				LOGGER.info("TaskController: Empty Params");
+				return ResponseEntity.status(500).body(new ResponseObject(500, "Invalid value", ""));
+			}
+			String id = (String) body.get("id");
+			LOGGER.info("TaskController: set complete tasks with id " + id);
+			Boolean checkUpdate = service.setComplete(id);
+			if (checkUpdate) {
+				return ResponseEntity.status(200).body(new ResponseObject(200, String.format("Task %s was updated", id), ""));
+			}
+			return ResponseEntity.status(200).body(new ResponseObject(204, String.format("Cannot update Task %s ", id), ""));
+		} catch (MongoException e) {
+			LOGGER.info("TaskController: Error");
+			return ResponseEntity.status(500).body(new ResponseObject(500, "Server Error", ""));
+		}
+	}
+	
+	/**
+	 * @author Quang
+	 * delete exist tasks
+	 * @param list<id>
+	 */
+	@DeleteMapping(value = "/delete")
+	ResponseEntity<ResponseObject> deleteTasks(@RequestBody Map<String, Object> body) {
+		try {
+			LOGGER.info("TaskController: Delete a Task or list Tasks by id");
+			if (body.isEmpty() || !body.containsKey("ids")) {
+				LOGGER.info("TaskController: Empty Params");
+				return ResponseEntity.status(500).body(new ResponseObject(500, "Invalid value", ""));
+			}
+			List<String> ids =  (List<String>) body.get("ids");
+			Boolean checkUpdate = service.deleteTasks(ids);
+			if (checkUpdate) {
+				return ResponseEntity.status(200).body(new ResponseObject(200, "Success", ids));
+			}
+			return ResponseEntity.status(200).body(new ResponseObject(204, "Cannot delete Tasks", ""));
 		} catch (MongoException e) {
 			LOGGER.info("TaskController: Error");
 			return ResponseEntity.status(500).body(new ResponseObject(500, "Server Error", ""));
