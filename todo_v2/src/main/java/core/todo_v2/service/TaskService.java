@@ -22,6 +22,7 @@ import org.springframework.stereotype.Service;
 import com.mongodb.MongoException;
 import com.mongodb.client.MongoCollection;
 
+import core.todo_v2.helper.Utils;
 import core.todo_v2.model.Task;
 import core.todo_v2.repository.TaskRepository;
 
@@ -33,15 +34,19 @@ public class TaskService {
 	@Autowired
 	private MongoTemplate mongoTemplate;
 
+	@Autowired
+	Utils utils;
+
 	private static Logger LOGGER = LoggerFactory.getLogger(TaskService.class);
 
 	private MongoCollection<Document> getCollectionTasks() {
 		return mongoTemplate.getCollection("tasks");
 	}
 
-	public List<Task> getAllTasks() {
+	public List<Document> getAllTasks() {
 		LOGGER.info("TaskService - Get all Tasks");
-		List<Task> lstTasks = mongoTemplate.findAll(Task.class);
+		List<Document> lstTasks = getCollectionTasks().find().projection(new Document("_class", 0)).into(new ArrayList<Document>());
+		lstTasks = utils.convertId(lstTasks);
 		return lstTasks;
 	}
 
@@ -62,26 +67,53 @@ public class TaskService {
 	 * cần thêm các tính năng: - search theo id (done) - search trong khoảng thời
 	 * gian từ ngày nào tới ngày nào - search xem task được hoàn thành hay chưa
 	 * 
-	 * @param body
+	 * @param body: id, des, frDate, toDate: Date format: yyyy-mm-dd
 	 * @return
 	 */
-	public List<Task> searchTasks(Map<String, Object> body) {
+	public List<Document> searchTasks(Map<String, Object> body) {
 		try {
-			List<Task> lstTasks = new ArrayList<>();
+			List<Document> lstTasks = new ArrayList<>();
+			Document projection = new Document("_class", 0);
 
 			// Search Task by Id
 			if (body.containsKey("id")) {
 				ObjectId id = new ObjectId((String) body.get("id"));
-				Task task = mongoTemplate.findById(id, Task.class);
+				Document task = getCollectionTasks().find(new Document("_id", id)).projection(projection).first();
 				lstTasks.add(task);
-				return lstTasks;
+				return utils.convertId(lstTasks);
+			}
+			
+			//filter chứa các query trong $and
+			Document filterAppend = new Document();
+
+			// Search Task by Des
+			String des = (String) body.get("des");
+			if (body.containsKey("des") && !des.isBlank() && !des.isEmpty()) {
+				filterAppend.append("des", new Document("$regex", des).append("$options", "i"));
 			}
 
-			String des = (String) body.get("des");
-			Query query = new Query();
-			query.addCriteria(Criteria.where("des").regex(des, "i"));
-			lstTasks = mongoTemplate.find(query, Task.class);
-			return lstTasks;
+			// Search Task by date
+			if (body.containsKey("frDate") || body.containsKey("toDate")) {
+				//from date
+				if (body.containsKey("frDate")) {
+					String tmpFrDate = (String) body.get("frDate");
+					Date frDate = utils.parseStringToISODate(tmpFrDate);
+					filterAppend.append("created", new Document("$gte", frDate));
+				}
+				
+				//to date
+				if (body.containsKey("toDate")) {
+					String tmpToDate = (String) body.get("toDate");
+					Date toDate = utils.parseStringToISODate(tmpToDate);
+					filterAppend.append("created", new Document("$lte", toDate));					
+				}
+			}
+			if (filterAppend.size() < 1) {
+				return null;
+			}
+			Document filter = new Document("$and", Arrays.asList(filterAppend));
+			lstTasks = getCollectionTasks().find(filter).projection(projection).into(new ArrayList<Document>());
+			return utils.convertId(lstTasks);
 		} catch (MongoException e) {
 			LOGGER.info("TaskService: {}", e);
 			return null;
@@ -104,7 +136,7 @@ public class TaskService {
 			return false;
 		}
 	}
-	
+
 	public Boolean deleteTasks(List<String> ids) {
 		try {
 			List<ObjectId> lstId = new ArrayList<>();
@@ -117,7 +149,7 @@ public class TaskService {
 			if (lstId.size() < 1) {
 				return false;
 			}
-			Document filter = new Document("_id", new Document("$in",lstId));
+			Document filter = new Document("_id", new Document("$in", lstId));
 			getCollectionTasks().deleteMany(filter);
 			return true;
 		} catch (MongoException e) {

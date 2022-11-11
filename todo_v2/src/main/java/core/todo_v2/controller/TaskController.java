@@ -20,6 +20,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.mongodb.MongoException;
 
 import core.todo_v2.helper.ResponseObject;
+import core.todo_v2.helper.Utils;
 import core.todo_v2.model.Task;
 import core.todo_v2.service.TaskService;
 
@@ -31,6 +32,9 @@ public class TaskController {
 
 	@Autowired
 	TaskService service;
+	
+	@Autowired
+	Utils utils;
 
 	/**
 	 * @author Quang get all Tasks
@@ -38,9 +42,9 @@ public class TaskController {
 	@GetMapping(value = "/all")
 	ResponseEntity<ResponseObject> getAllTasks() {
 		try {
-			List<Task> data = service.getAllTasks();
+			List<Document> data = service.getAllTasks();
 			if (data.isEmpty()) {
-				return ResponseEntity.status(404).body(new ResponseObject(404, "Data not exists", ""));
+				return ResponseEntity.status(205).body(new ResponseObject(205, "Data not exists", ""));
 			}
 			return ResponseEntity.status(HttpStatus.OK).body(new ResponseObject(200, "Success", data));
 		} catch (MongoException e) {
@@ -59,6 +63,7 @@ public class TaskController {
 	ResponseEntity<ResponseObject> addTask(@RequestBody Map<String, Object> body) {
 		try {
 			LOGGER.info("TaskController: add new task");
+			body = utils.checkParams(body);
 			if (body.isEmpty() || !body.containsKey("des")) {
 				LOGGER.info("TaskController: Empty Params");
 				return ResponseEntity.status(500).body(new ResponseObject(500, "Invalid value", ""));
@@ -78,20 +83,22 @@ public class TaskController {
 	}
 
 	/**
-	 * @author Quang search task by description
+	 * @author Quang search task by description, id
 	 * @param des
 	 */
 	@GetMapping(value = "/search")
 	ResponseEntity<ResponseObject> getTasksByDes(@RequestBody Map<String, Object> body) {
 		try {
 			LOGGER.info("TaskController: search tasks");
+			body = utils.checkParams(body);
 			if (body.isEmpty()) {
 				LOGGER.info("TaskController: Empty Params");
+				System.out.println((String) body.get("des"));
 				return ResponseEntity.status(500).body(new ResponseObject(500, "Invalid value", ""));
 			}
-			List<Task> data = service.searchTasks(body);
-			if (data.isEmpty() || data == null) {
-				return ResponseEntity.status(204).body(new ResponseObject(204, "No content", ""));
+			List<Document> data = service.searchTasks(body);
+			if (data == null) {
+				return ResponseEntity.status(400).body(new ResponseObject(204, "No content", ""));
 			}
 			return ResponseEntity.status(200).body(new ResponseObject(200, "Success", data));
 		} catch (MongoException e) {
@@ -108,6 +115,7 @@ public class TaskController {
 	ResponseEntity<ResponseObject> setComplete(@RequestBody Map<String, Object> body) {
 		try {
 			LOGGER.info("TaskController: set complete tasks");
+			body = utils.checkParams(body);
 			if (body.isEmpty() || !body.containsKey("id")) {
 				LOGGER.info("TaskController: Empty Params");
 				return ResponseEntity.status(500).body(new ResponseObject(500, "Invalid value", ""));
@@ -128,12 +136,13 @@ public class TaskController {
 	/**
 	 * @author Quang
 	 * delete exist tasks
-	 * @param list<id>
+	 * @param list<String> ids
 	 */
 	@DeleteMapping(value = "/delete")
 	ResponseEntity<ResponseObject> deleteTasks(@RequestBody Map<String, Object> body) {
 		try {
 			LOGGER.info("TaskController: Delete a Task or list Tasks by id");
+			body = utils.checkParams(body);
 			if (body.isEmpty() || !body.containsKey("ids")) {
 				LOGGER.info("TaskController: Empty Params");
 				return ResponseEntity.status(500).body(new ResponseObject(500, "Invalid value", ""));
