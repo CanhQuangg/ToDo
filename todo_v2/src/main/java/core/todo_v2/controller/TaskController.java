@@ -15,13 +15,13 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.mongodb.MongoException;
 
 import core.todo_v2.helper.ResponseObject;
 import core.todo_v2.helper.Utils;
-import core.todo_v2.model.Task;
 import core.todo_v2.service.TaskService;
 
 @RestController
@@ -32,7 +32,7 @@ public class TaskController {
 
 	@Autowired
 	TaskService service;
-	
+
 	@Autowired
 	Utils utils;
 
@@ -40,9 +40,13 @@ public class TaskController {
 	 * @author Quang get all Tasks
 	 */
 	@GetMapping(value = "/all")
-	ResponseEntity<ResponseObject> getAllTasks() {
+	ResponseEntity<ResponseObject> getAllTasks(
+			@RequestParam(value = "limit", required = false, defaultValue = "30") Integer limit,
+			@RequestParam(value = "page", required = false, defaultValue = "1") Integer page) {
 		try {
-			List<Document> data = service.getAllTasks();
+			limit = utils.limitValid(limit);
+			page = utils.pageValid(page, limit);
+			List<Document> data = service.getAllTasks(limit, page);
 			if (data.isEmpty()) {
 				return ResponseEntity.status(205).body(new ResponseObject(205, "Data not exists", ""));
 			}
@@ -87,14 +91,14 @@ public class TaskController {
 	 * @param des
 	 */
 	@GetMapping(value = "/search")
-	ResponseEntity<ResponseObject> getTasksByDes(@RequestBody Map<String, Object> body) {
+	ResponseEntity<ResponseObject> searchTask(@RequestBody Map<String, Object> body) {
 		try {
 			LOGGER.info("TaskController: search tasks");
 			body = utils.checkParams(body);
 			if (body.isEmpty()) {
 				LOGGER.info("TaskController: Empty Params");
 				System.out.println((String) body.get("des"));
-				return ResponseEntity.status(500).body(new ResponseObject(500, "Invalid value", ""));
+				return ResponseEntity.status(205).body(new ResponseObject(205, "Invalid value", ""));
 			}
 			List<Document> data = service.searchTasks(body);
 			if (data == null) {
@@ -106,36 +110,37 @@ public class TaskController {
 			return ResponseEntity.status(500).body(new ResponseObject(500, "Server Error", ""));
 		}
 	}
-	
+
 	/**
-	 * @author Quang
-	 * set status of task is complete
+	 * @author Quang set status of task is complete
+	 * @param List<String> ids
 	 */
 	@PutMapping(value = "/setComplete")
 	ResponseEntity<ResponseObject> setComplete(@RequestBody Map<String, Object> body) {
 		try {
 			LOGGER.info("TaskController: set complete tasks");
 			body = utils.checkParams(body);
-			if (body.isEmpty() || !body.containsKey("id")) {
+			if (body.isEmpty() || !body.containsKey("ids")) {
 				LOGGER.info("TaskController: Empty Params");
 				return ResponseEntity.status(500).body(new ResponseObject(500, "Invalid value", ""));
 			}
-			String id = (String) body.get("id");
-			LOGGER.info("TaskController: set complete tasks with id " + id);
-			Boolean checkUpdate = service.setComplete(id);
+			List<String> ids = (List<String>) body.get("ids");
+			LOGGER.info("TaskController: set complete tasks with id " + ids);
+			Boolean checkUpdate = service.setComplete(ids);
 			if (checkUpdate) {
-				return ResponseEntity.status(200).body(new ResponseObject(200, String.format("Task %s was updated", id), ""));
+				return ResponseEntity.status(200)
+						.body(new ResponseObject(200, String.format("Task %s was updated", ids), ""));
 			}
-			return ResponseEntity.status(200).body(new ResponseObject(204, String.format("Cannot update Task %s ", id), ""));
+			return ResponseEntity.status(200)
+					.body(new ResponseObject(204, String.format("Cannot update Task %s ", ids), ""));
 		} catch (MongoException e) {
 			LOGGER.info("TaskController: Error");
 			return ResponseEntity.status(500).body(new ResponseObject(500, "Server Error", ""));
 		}
 	}
-	
+
 	/**
-	 * @author Quang
-	 * delete exist tasks
+	 * @author Quang delete exist tasks
 	 * @param list<String> ids
 	 */
 	@DeleteMapping(value = "/delete")
@@ -145,9 +150,9 @@ public class TaskController {
 			body = utils.checkParams(body);
 			if (body.isEmpty() || !body.containsKey("ids")) {
 				LOGGER.info("TaskController: Empty Params");
-				return ResponseEntity.status(500).body(new ResponseObject(500, "Invalid value", ""));
+				return ResponseEntity.status(205).body(new ResponseObject(205, "Invalid value", ""));
 			}
-			List<String> ids =  (List<String>) body.get("ids");
+			List<String> ids = (List<String>) body.get("ids");
 			Boolean checkUpdate = service.deleteTasks(ids);
 			if (checkUpdate) {
 				return ResponseEntity.status(200).body(new ResponseObject(200, "Success", ids));

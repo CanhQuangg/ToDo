@@ -51,16 +51,56 @@ public class Utils {
 	public Map<String, Object> checkParams(Map<String, Object> body) {
 		Map<String, Object> checkedBody = new HashMap<>();
 		try {
-			Set<String> keys = body.keySet();
+			Set<String> keys = body.keySet(); // lấy Set các key của Map
 			for (String key : keys) {
-				String value = (String) body.get(key);
+				String value = "";
+				try {
+					value = (String) body.get(key);					
+				} catch (Exception e) {
+					checkedBody.put(key, body.get(key));
+				}
 				if (!value.isBlank() && !value.isEmpty() && value != null) {
 					checkedBody.put(key, value);
 				}
 			}
+
 			return checkedBody;
 		} catch (Exception e) {
 			return checkedBody;
+		}
+	}
+
+	/**
+	 * @author Quang
+	 * @param int limit
+	 * @return limitValid
+	 */
+	public int limitValid(int limit) {
+		try {
+			if (limit > 10 || limit < 1) {
+				return 10;
+			}
+			return limit;
+		} catch (Exception e) {
+			return 10;
+		}
+	}
+	
+	/**
+	 * @author Quang
+	 * @param page
+	 * @param limit
+	 * @return skipPage
+	 */
+	public int pageValid(int page, int limit) {
+		try {
+			if (page < 1) {
+				page = 1;
+			}
+			int offsetValid = (page - 1) * limit;
+			return offsetValid;
+		} catch (Exception e) {
+			return 0;
 		}
 	}
 }
